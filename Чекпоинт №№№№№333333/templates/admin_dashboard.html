@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель администратора — Отклик</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; padding: 24px; color: #0f172a; margin: 0; }
+        .container { max-width: 1100px; margin: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .card { background: white; border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-top: 14px; }
+        .stat-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 14px; text-align: center; }
+        .stat-val { font-size: 24px; font-weight: 700; color: #4f46e5; margin-top: 4px; }
+        .stat-label { font-size: 12px; color: #64748b; }
+        .btn-csv { background: #059669; color: white; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-csv:hover { background: #047857; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; color: #475569; font-weight: 600; }
+        .form-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+        input, select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+        button { padding: 8px 16px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-danger { background: #fee2e2; color: #991b1b; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+        .flash { padding: 12px 16px; border-radius: 12px; margin-bottom: 20px; font-size: 14px; background: #d1fae5; color: #065f46; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>⚙️ Управление системой «Отклик»</h1>
+            <span style="color: #64748b; font-size: 14px;">Администратор: {{ current_user.username }}</span>
+        </div>
+        <a href="{{ url_for('logout') }}" style="color: #ef4444; text-decoration: none; font-weight: 600;">Выйти</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="flash">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- ДАШБОРД И ОБЕЗЛИЧЕННЫЙ CSV-ДАТАСЕТ -->
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <h2 style="margin: 0;">📊 Сводная аналитика (Датасет)</h2>
+            <a href="{{ url_for('admin_export_csv') }}" class="btn-csv">📥 Скачать обезличенный датасет (CSV)</a>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-box"><div class="stat-label">Всего обращений</div><div class="stat-val">{{ total }}</div></div>
+            <div class="stat-box"><div class="stat-label">Новые (очередь)</div><div class="stat-val">{{ by_status.get('new', 0) }}</div></div>
+            <div class="stat-box"><div class="stat-label">В работе</div><div class="stat-val">{{ by_status.get('in_progress', 0) }}</div></div>
+            <div class="stat-box"><div class="stat-label">Ответ готов</div><div class="stat-val">{{ by_status.get('ready', 0) }}</div></div>
+            <div class="stat-box"><div class="stat-label">Возвраты (не помогло)</div><div class="stat-val" style="color:#f59e0b;">{{ by_status.get('returned', 0) }}</div></div>
+            <div class="stat-box"><div class="stat-label">Завершено успешно</div><div class="stat-val" style="color:#10b981;">{{ by_status.get('completed', 0) }}</div></div>
+            <div class="stat-box"><div class="stat-label">Отклонено спам</div><div class="stat-val" style="color:#ef4444;">{{ by_status.get('rejected', 0) }}</div></div>
+            <div class="stat-box"><div class="stat-label">Средняя оценка</div><div class="stat-val" style="color:#f59e0b;">⭐ {{ avg_rating }}</div></div>
+        </div>
+    </div>
+
+    <!-- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (С7.3) -->
+    <div class="card">
+        <h2>👥 Управление сотрудниками (Создание, изменение логина/пароля/должности)</h2>
+        
+        <!-- Форма добавления сотрудника -->
+        <form method="post" action="{{ url_for('admin_add_user') }}" class="form-row" style="background:#f8fafc; padding:14px; border-radius:10px; border:1px solid #cbd5e1;">
+            <strong style="width:100%; font-size:13px; color:#334155;">+ Создать нового сотрудника:</strong>
+            <input type="text" name="username" placeholder="Логин" required style="flex:1;">
+            <input type="password" name="password" placeholder="Пароль" required style="flex:1;">
+            <select name="role" required>
+                <option value="operator">Оператор</option>
+                <option value="expert" selected>Эксперт</option>
+                <option value="admin">Администратор</option>
+            </select>
+            <select name="specialization">
+                <option value="">Без специализации</option>
+                <option value="Психолог">Психолог</option>
+                <option value="Юрист">Юрист</option>
+                <option value="Конфликтолог">Конфликтолог</option>
+                <option value="Социальный педагог">Социальный педагог</option>
+            </select>
+            <input type="number" name="max_cases" value="5" min="1" max="20" title="Лимит дел" style="width:70px;">
+            <button type="submit" class="btn-primary">Создать</button>
+        </form>
+
+        <!-- Таблица сотрудников с быстрым редактированием -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Логин</th>
+                    <th>Роль</th>
+                    <th>Специализация / Должность</th>
+                    <th>Лимит дел</th>
+                    <th>Быстрая смена пароля / должности</th>
+                    <th>Удалить</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td><b>{{ u.username }}</b></td>
+                    <td>{{ u.role }}</td>
+                    <td>{{ u.specialization or '—' }}</td>
+                    <td>{{ u.max_active_cases }} дел</td>
+                    <td>
+                        <form method="post" action="{{ url_for('admin_edit_user', user_id=u.id) }}" style="display:flex; gap:6px;">
+                            <input type="password" name="password" placeholder="Новый пароль" style="font-size:12px; width:110px;">
+                            <select name="role" style="font-size:12px;">
+                                <option value="operator" {% if u.role=='operator' %}selected{% endif %}>Оператор</option>
+                                <option value="expert" {% if u.role=='expert' %}selected{% endif %}>Эксперт</option>
+                                <option value="admin" {% if u.role=='admin' %}selected{% endif %}>Админ</option>
+                            </select>
+                            <select name="specialization" style="font-size:12px;">
+                                <option value="" {% if not u.specialization %}selected{% endif %}>—</option>
+                                <option value="Психолог" {% if u.specialization=='Психолог' %}selected{% endif %}>Психолог</option>
+                                <option value="Юрист" {% if u.specialization=='Юрист' %}selected{% endif %}>Юрист</option>
+                                <option value="Конфликтолог" {% if u.specialization=='Конфликтолог' %}selected{% endif %}>Конфликтолог</option>
+                                <option value="Социальный педагог" {% if u.specialization=='Социальный педагог' %}selected{% endif %}>Соцпедагог</option>
+                            </select>
+                            <input type="hidden" name="max_cases" value="{{ u.max_active_cases }}">
+                            <button type="submit" class="btn-primary" style="font-size:11px; padding:4px 8px;">Сохранить</button>
+                        </form>
+                    </td>
+                    <td>
+                        {% if u.id != current_user.id %}
+                        <form method="post" action="{{ url_for('admin_delete_user', user_id=u.id) }}">
+                            <button type="submit" class="btn-danger" onclick="return confirm('Удалить сотрудника {{ u.username }}?')">✕</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- РАЗБЛОКИРОВКА ЗАВИСШИХ ОБРАЩЕНИЙ С АУДИТ-ЛОГОМ (С7.5) -->
+    <div class="card">
+        <h2>🛠️ Разблокировка зависших обращений (Аудит-контроль)</h2>
+        {% if stuck_appeals %}
+            <table>
+                <thead>
+                    <tr><th>Трек</th><th>Создано (ЕКБ)</th><th>Текущий статус</th><th>Простой</th><th>Действие администратора</th></tr>
+                </thead>
+                <tbody>
+                    {% for a in stuck_appeals %}
+                    {% set wait_hours = ((now - a.updated_at).total_seconds() / 3600) | round(1) %}
+                    <tr>
+                        <td><b>{{ a.track_number }}</b></td>
+                        <td>{{ a.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>{{ a.status_display }}</td>
+                        <td><span style="color:#dc2626; font-weight:600;">{{ wait_hours }} ч. назад</span></td>
+                        <td>
+                            <form method="post" action="{{ url_for('admin_override_appeal', appeal_id=a.id) }}" style="display:flex; gap:8px;">
+                                <select name="new_status">
+                                    <option value="ready">Ответ готов</option>
+                                    <option value="in_progress">В работу</option>
+                                    <option value="returned">На возврат оператору</option>
+                                </select>
+                                <input type="text" name="reason" placeholder="Причина вмешательства..." required style="width:200px;">
+                                <button type="submit" class="btn-primary">Применить</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="color: #64748b; font-size: 13px;">Зависших обращений нет.</p>
+        {% endif %}
+    </div>
+
+    <!-- СПРАВОЧНИК КАТЕГОРИЙ (С7.1 и С7.2) -->
+    <div class="card">
+        <h2>📂 Справочник категорий и маршрутизация</h2>
+        <form method="post" action="{{ url_for('admin_add_category') }}" class="form-row" style="margin-top: 14px;">
+            <input type="text" name="name" placeholder="Название новой категории..." required style="flex:1;">
+            <select name="expert_group">
+                <option value="psychologist">Направлять: Психологам</option>
+                <option value="lawyer">Направлять: Юристам</option>
+                <option value="conflictologist">Направлять: Конфликтологам</option>
+                <option value="social_pedagogue">Направлять: Соцпедагогам</option>
+            </select>
+            <button type="submit" class="btn-primary">Добавить правило</button>
+        </form>
+
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Категория</th><th>Группа специалистов</th><th>Удаление</th></tr>
+            </thead>
+            <tbody>
+                {% for cat in categories %}
+                <tr>
+                    <td>#{{ cat.id }}</td>
+                    <td><b>{{ cat.name }}</b></td>
+                    <td>{{ cat.expert_group or 'Психологи' }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('admin_delete_category', cat_id=cat.id) }}">
+                            <button type="submit" class="btn-danger" onclick="return confirm('Удалить категорию?')">Удалить</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>
