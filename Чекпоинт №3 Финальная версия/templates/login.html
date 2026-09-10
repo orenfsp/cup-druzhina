@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход для сотрудников — Отклик</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #f7f9fc;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .login-container {
+            max-width: 440px;
+            width: 100%;
+            background: white;
+            border-radius: 24px;
+            padding: 40px 32px;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.08);
+        }
+        .brand { text-align: center; margin-bottom: 28px; }
+        .brand h1 { font-size: 28px; font-weight: 600; color: #1a1a2e; }
+        .brand .subtitle { color: #5a5a7a; font-size: 15px; margin-top: 6px; }
+        .badge {
+            display: inline-block;
+            background: #eef2ff;
+            color: #4f46e5;
+            font-size: 13px;
+            font-weight: 500;
+            padding: 4px 14px;
+            border-radius: 20px;
+            margin-bottom: 16px;
+        }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 500; font-size: 14px; color: #1a1a2e; margin-bottom: 6px; }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 15px;
+            background: #fafbfc;
+            transition: border 0.2s;
+        }
+        input:focus { outline: none; border-color: #4f46e5; background: white; }
+        .btn {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .btn:hover { background: #4338ca; }
+        .flash {
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        .divider { border: none; border-top: 1px solid #eef2f6; margin: 24px 0; }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #4f46e5;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="brand">
+            <div class="badge">🔐 Для сотрудников</div>
+            <h1>Отклик</h1>
+            <p class="subtitle">Войдите в систему поддержки</p>
+        </div>
+
+        <!-- Показываем строго ошибки логина, без сообщений заявителей! -->
+        {% with messages = get_flashed_messages(category_filter=['login_error', 'danger']) %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="post">
+            <div class="form-group">
+                <label for="username">Логин</label>
+                <input type="text" id="username" name="username" placeholder="Введите логин" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">Пароль</label>
+                <input type="password" id="password" name="password" placeholder="Введите пароль" required>
+            </div>
+            <button type="submit" class="btn">Войти</button>
+        </form>
+
+        <hr class="divider">
+        <div style="text-align: center;">
+            <a href="/" class="back-link">← На главную платформы</a>
+        </div>
+    </div>
+</body>
+</html>

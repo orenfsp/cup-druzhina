@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель эксперта — Отклик</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px; color: #0f172a; margin: 0; }
+        .container { max-width: 1100px; margin: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .appeal-card { background: white; border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-left: 5px solid #4f46e5; }
+        .appeal-card.urgent { border-left-color: #ef4444; background: #fff5f5; }
+        .meta { display: flex; flex-wrap: wrap; gap: 14px; color: #64748b; font-size: 14px; margin-bottom: 12px; }
+        .badge { background: #e0e7ff; color: #3730a3; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .chat-box { background: #f1f5f9; border-radius: 12px; padding: 14px; margin: 14px 0; max-height: 220px; overflow-y: auto; }
+        .msg { padding: 6px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+        .msg .from { font-weight: 600; color: #4f46e5; }
+        .msg .from.expert { color: #059669; }
+        .note { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; padding: 8px 12px; border-radius: 8px; margin: 6px 0; font-size: 13px; }
+        .form-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+        input, textarea, select { padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; }
+        button { padding: 8px 16px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-success { background: #059669; color: white; }
+        .btn-secondary { background: #64748b; color: white; }
+        .flash { padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; background: #d1fae5; color: #065f46; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>🧑‍🔬 Рабочее место эксперта</h1>
+            <span style="color: #64748b; font-size: 14px;">Специалист: {{ current_user.username }} ({{ current_user.specialization or 'Эксперт' }})</span>
+        </div>
+        <a href="{{ url_for('logout') }}" style="color: #ef4444; text-decoration: none; font-weight: 600;">Выйти</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="flash">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <h2>Мои активные обращения ({{ appeals|length }})</h2>
+
+    {% if appeals %}
+        {% for appeal in appeals %}
+            <div class="appeal-card {% if appeal.priority == 'urgent' %}urgent{% endif %}">
+                <div class="meta">
+                    <span><strong>Трек:</strong> {{ appeal.track_number }}</span>
+                    <span><strong>Заявитель:</strong> {{ appeal.applicant_type_display }} (Анонимно)</span>
+                    <span><strong>Статус:</strong> <span class="badge">{{ appeal.status_display }}</span></span>
+                    <span><strong>Приоритет:</strong> {{ appeal.priority_display }}</span>
+                    <span><strong>Создано:</strong> {{ appeal.created_at.strftime('%d.%m.%Y %H:%M') }} (ЕКБ)</span>
+                    {% if appeal.is_crisis %}<span class="badge" style="background:#fee2e2; color:#991b1b;">⚠️ Кризис</span>{% endif %}
+                    {% if appeal.co_expert_id == current_user.id %}
+                        <span class="badge" style="background:#fef3c7; color:#92400e;">👥 Вы назначены соисполнителем</span>
+                    {% endif %}
+                </div>
+
+                <div style="font-size: 15px; margin: 12px 0;"><strong>Текст проблемы:</strong> {{ appeal.text }}</div>
+
+                <!-- Эксперт изучает доказательства травли -->
+                {% if appeal.attachments.all() %}
+                <div style="margin: 14px 0; background: #f8fafc; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <strong style="font-size: 13px; color: #1e293b;">📎 Прикреплённые заявителем доказательства ({{ appeal.attachments.count() }}):</strong>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px;">
+                        {% for att in appeal.attachments.all() %}
+                            <a href="{{ url_for('uploaded_file', filename=att.filename) }}" target="_blank" title="Открыть в полном размере">
+                                <img src="{{ url_for('uploaded_file', filename=att.filename) }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1.5px solid #cbd5e1;" alt="Вложение">
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if appeal.status == 'distributed' %}
+                <form method="post" action="{{ url_for('expert_take', appeal_id=appeal.id) }}" style="margin-bottom: 12px;">
+                    <button type="submit" class="btn-primary">▶️ Взять в работу</button>
+                </form>
+                {% endif %}
+
+                <!-- Диалог с заявителем -->
+                <strong>💬 Диалог с заявителем:</strong>
+                <div class="chat-box">
+                    {% for msg in appeal.messages.all() if not msg.is_internal %}
+                        <div class="msg">
+                            <span class="from {% if msg.is_from_expert %}expert{% endif %}">
+                                {% if msg.is_from_expert %}Вы (Специалист){% else %}Заявитель{% endif %}:
+                            </span>
+                            <span>{{ msg.text }}</span>
+                            <span style="color: #94a3b8; font-size: 11px; margin-left: 8px;">{{ msg.created_at.strftime('%H:%M') }}</span>
+                        </div>
+                    {% else %}
+                        <span style="color: #94a3b8; font-size: 13px;">Сообщений пока нет.</span>
+                    {% endfor %}
+                </div>
+
+                <form method="post" action="{{ url_for('expert_send_message', appeal_id=appeal.id) }}" class="form-row">
+                    <input type="text" name="text" placeholder="Задать уточняющий вопрос заявителю..." style="flex:1;" required>
+                    <button type="submit" class="btn-primary">Спросить</button>
+                </form>
+
+                <!-- Внутренние заметки -->
+                <div style="margin-top: 14px; background: #fefce8; padding: 12px; border-radius: 10px; border: 1px solid #fef08a;">
+                    <strong style="font-size: 13px; color: #854d0e;">🔒 Скрытые внутренние заметки (заявитель их НЕ видит):</strong>
+                    {% for note in appeal.internal_notes.all() %}
+                        <div class="note"><b>{{ note.author.username }}:</b> {{ note.text }} ({{ note.created_at.strftime('%H:%M') }})</div>
+                    {% endfor %}
+                    <form method="post" action="{{ url_for('expert_add_note', appeal_id=appeal.id) }}" class="form-row">
+                        <input type="text" name="note" placeholder="Заметка для коллег-специалистов..." style="flex:1;" required>
+                        <button type="submit" class="btn-secondary">Добавить заметку</button>
+                    </form>
+                </div>
+
+                <!-- СОВМЕСТНАЯ РАБОТА: СОИСПОЛНИТЕЛЬ И ПЕРЕДАЧА (С4.4 И С4.5) -->
+                <div style="margin-top: 14px; background: #f1f5f9; padding: 14px; border-radius: 12px;">
+                    <strong style="font-size: 13px; color: #334155;">👥 Совместная работа специалистов:</strong>
+                    <div style="display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px;">
+                        <!-- Подключить соисполнителя -->
+                        <form method="post" action="{{ url_for('expert_add_coexpert', appeal_id=appeal.id) }}" style="display:flex; gap:6px; flex:1;">
+                            <select name="co_expert_id" required style="font-size:13px;">
+                                <option value="">Подключить коллегу другого профиля...</option>
+                                {% for col in colleagues %}
+                                    <option value="{{ col.id }}">{{ col.username }} ({{ col.specialization or col.role }})</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn-primary" style="font-size:12px;">+ Соисполнитель</button>
+                        </form>
+
+                        <!-- Передать дело полностью -->
+                        <form method="post" action="{{ url_for('expert_request_transfer', appeal_id=appeal.id) }}" style="display:flex; gap:6px; flex:1;">
+                            <select name="target_expert_id" required style="font-size:13px;">
+                                <option value="">Передать дело специалисту...</option>
+                                {% for col in colleagues %}
+                                    <option value="{{ col.id }}">{{ col.username }} ({{ col.specialization or col.role }})</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="reason" placeholder="Причина..." required style="font-size:12px; width:120px;">
+                            <button type="submit" class="btn-secondary" style="font-size:12px;">Передать</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ФИНАЛЬНАЯ РЕКОМЕНДАЦИЯ -->
+                <div style="margin-top: 16px; background: #f0fdf4; padding: 14px; border-radius: 12px; border: 1.5px solid #bbf7d0;">
+                    <strong style="color: #166534; font-size: 14px;">💡 Финальная рекомендация заявителю:</strong>
+                    <form method="post" action="{{ url_for('expert_give_recommendation', appeal_id=appeal.id) }}" style="margin-top: 8px;">
+                        <textarea name="recommendation" placeholder="Сформулируйте совет и план действий для заявителя..." rows="3" style="width:100%;" required>{{ appeal.recommendation or '' }}</textarea>
+                        <button type="submit" class="btn-success" style="margin-top: 6px;">Отправить рекомендацию (Статус: Ответ готов)</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p style="color: #64748b;">У вас пока нет активных назначенных обращений.</p>
+    {% endif %}
+</div>
+</body>
+</html>
