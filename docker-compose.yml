@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: otklik_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: otklik
+      POSTGRES_USER: otklik_user
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  web:
+    build: .
+    container_name: otklik_web
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: otklik
+      DB_USER: otklik_user
+      DB_PASSWORD: secret
+      SECRET_KEY: otklik-hackathon-key
+    depends_on:
+      - postgres
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  pgdata:
